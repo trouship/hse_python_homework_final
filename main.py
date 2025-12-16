@@ -13,36 +13,39 @@ class Priority(Enum):
 
 class Task:
     def __init__(self, title, priority, is_done, id):
-        self.__title = title
-        self.__priority = priority
-        self.__is_done = is_done
-        self.__id = id
+        if type(priority) is not Priority:
+            raise TypeError(f"priorty param must be a priority enum, but got {type(priority))}")
+        
+        self._title = title
+        self._priority = priority
+        self._is_done = is_done
+        self._id = id
 
     @property
     def title(self):
-        return self.__title
+        return self._title
 
     @property
     def priority(self):
-        return self.__priority.name
+        return self._priority.name
 
     @property
     def is_done(self):
-        return self.__is_done
+        return self._is_done
 
     @property
     def id(self):
-        return self.__id
+        return self._id
 
     def complete(self):
-        self.__is_done = True
+        self._is_done = True
 
     def to_dict(self):
         return {
-            "title": self.__title,
-            "priority": self.__priority.value,
-            "is_done": self.__is_done,
-            "id": self.__id,
+            "title": self._title,
+            "priority": self._priority.value,
+            "is_done": self._is_done,
+            "id": self._id,
         }
 
     @staticmethod
@@ -55,20 +58,23 @@ class Task:
 
 class FileStorage:
     def __init__(self, file_path):
-        self.__file_path = Path(file_path)
+        self._file_path = Path(file_path)
 
     def save_tasks(self, tasks):
-        with self.__file_path.open('w', encoding="utf-8") as w:
+        with self._file_path.open('w', encoding="utf-8") as w:
             for task in tasks:
                 try:
                     json_task = json.dumps(task.to_dict())
                     w.write(json_task + '\n')
                 except Exception as e:
-                    print(f"Save parse error: {e} {task}")
+                    print(f"save parse error: {e} {task}")
 
-    def restore_tasks(self, tasks):
+    def restore_tasks(self):
         if not self.__file_path.exists():
-            raise FileNotFoundError
+            print($"restore file not found {self._file_path}")
+            return []
+
+        tasks = []
 
         with self.__file_path.open('r', encoding="utf-8") as r:
             for line in r:
@@ -77,6 +83,6 @@ class FileStorage:
                     task = Task.from_dict(data_task)
                     tasks.append(task)
                 except Exception as e:
-                    print(f"Restore parse error: {e} {line}")
-                    continue
-
+                    print(f"restore parse error: {e} {line}")
+                    
+        return tasks
