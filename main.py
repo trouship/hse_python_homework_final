@@ -44,7 +44,14 @@ class FileStorage:
     def save_tasks(self, tasks):
         with self.__file_path.open('w', encoding="utf-8") as w:
             for task in tasks:
-                pass
+                try:
+                    json_task = json.dumps(task)
+                except:
+                    print(f"Save parse error: {task}")
+                    continue;
+
+                w.write(json_task + '\n')                
+                
 
     def restore_tasks(self, tasks):
         if not self.__file_path.exists():
@@ -52,7 +59,13 @@ class FileStorage:
 
         with self.__file_path.open('r', encoding="utf-8") as r:
             for line in r:
-                pass
+                try:
+                    task = json.loads(line)
+                except:
+                    print(f"Restore parse error: {line}")
+                    continue;
+
+                append(tasks, task)
 
 
             
