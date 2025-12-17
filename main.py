@@ -1,3 +1,5 @@
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
 from enum import Enum
 from pathlib import Path
 import json
@@ -14,7 +16,7 @@ class Priority(Enum):
 class Task:
     def __init__(self, title, priority, is_done, id):
         if type(priority) is not Priority:
-            raise TypeError(f"priorty param must be a priority enum, but got {type(priority))}")
+            raise TypeError(f"priorty param must be a priority enum, but got {type(priority)}")
         
         self._title = title
         self._priority = priority
@@ -70,13 +72,13 @@ class FileStorage:
                     print(f"save parse error: {e} {task}")
 
     def restore_tasks(self):
-        if not self.__file_path.exists():
-            print($"restore file not found {self._file_path}")
+        if not self._file_path.exists():
+            print(f"restore file not found {self._file_path}")
             return []
 
         tasks = []
 
-        with self.__file_path.open('r', encoding="utf-8") as r:
+        with self._file_path.open('r', encoding="utf-8") as r:
             for line in r:
                 try:
                     data_task = json.loads(line)
@@ -86,3 +88,84 @@ class FileStorage:
                     print(f"restore parse error: {e} {line}")
                     
         return tasks
+
+class TaskManager:
+    def __init__(self, storage):
+        self._tasks = []
+        self._next_task_id = 1
+        self._storage = storage
+
+    def add_task(self, title, priority):
+        task = Task(title, priority, False, self._next_task_id)
+        self._tasks.append(task)
+        self._next_task_id += 1
+        return task
+
+    @property
+    def tasks(self):
+        return self._tasks
+
+    def save_tasks(self):
+        self._storage.save_tasks(self._tasks)
+
+    def restore_tasks(self):
+        self._tasks = self._storage.restore_tasks()
+
+    def complete_task(self, task_id):
+        for task in self._tasks:
+            if task.id == task_id:
+                task.complete()
+
+class TaskRESTHandler(BaseHTTPRequestHandler):
+    def _read_json_body(self):
+        length = int(self.headers.get('content-length', 0))
+        raw = self.rfile.read(length) if length > 0 else b""
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except Exception as e:
+            print(f"read body error: {e} {raw}")
+            return None
+
+    def _send_json(self, data, status=200):
+        payload = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _error(self, status, msg):
+        self._send_json({"error": msg, "status": status})
+
+    def create_task(self):
+        pass
+
+    def complete_task(self, task_id):
+        pass
+
+    def get_tasks(self):
+        pass
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        parts = [p for p in parsed.path.split("/") if p]
+
+        if parsed.path == "/tasks":
+            self.create_task()
+        elif len(parts) == 3 and parts[0] == "tasks" and parts[2] == "complete":
+            self.complete_task(parts[1])
+        else:
+            self._error(400, "Not found")
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        parts = [p for p in parsed.path.split("/") if p]
+
+        if parsed.path == "/tasks":
+            self.get_tasks()
+        else:
+            self._error(400, "Not found")
+
+
