@@ -46,7 +46,7 @@ class Task:
     def to_dict(self):
         return {
             "title": self._title,
-            "priority": self._priority.value,
+            "priority": self._priority.name,
             "is_done": self._is_done,
             "id": self._id,
         }
@@ -54,7 +54,7 @@ class Task:
     @staticmethod
     def from_dict(data):
         return Task(data["title"],
-                    Priority(data["priority"]),
+                    Priority[data["priority"]],
                     data["is_done"],
                     data["id"]
         )
@@ -64,11 +64,11 @@ class FileStorage:
         self._file_path = Path(file_path)
 
     def save_tasks(self, tasks):
-        with self._file_path.open('w', encoding="utf-8") as w:
+        with self._file_path.open('w', encoding="utf-8") as f_write:
             for task in tasks:
                 try:
                     json_task = json.dumps(task.to_dict())
-                    w.write(json_task + '\n')
+                    f_write.write(json_task + '\n')
                 except Exception as e:
                     print(f"save parse error: {e} {task}")
 
@@ -79,8 +79,8 @@ class FileStorage:
 
         tasks = []
 
-        with self._file_path.open('r', encoding="utf-8") as r:
-            for line in r:
+        with self._file_path.open('r', encoding="utf-8") as f_read:
+            for line in f_read:
                 try:
                     data_task = json.loads(line)
                     task = Task.from_dict(data_task)
@@ -111,6 +111,8 @@ class TaskManager:
 
     def restore_tasks(self):
         self._tasks = self._storage.restore_tasks()
+        if len(self._tasks) != 0:
+            self._next_task_id = self._tasks[-1].id + 1
 
     def complete_task(self, task_id):
         for task in self._tasks:
@@ -145,7 +147,7 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def _error(self, status, msg):
-        self._send_json({"error": msg, "status": status})
+        self._send_json({"error": msg}, status)
 
     def create_task(self):
         body = self._read_json_body()
@@ -154,7 +156,7 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            priority = Priority(body["priority"])
+            priority = Priority[body["priority"]]
             task = self._task_manager.add_task(body["title"], priority)
             self._task_manager.save_tasks()
             self._send_json(task.to_dict(), 201)
@@ -162,16 +164,20 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
             print(f"create task error: {e} {body}")
             self._error(400, f"create task error: {e}")
 
-    def complete_task(self, task_id):
+    def complete_task(self, task_oid):
         try:
-            if not self._task_manager.complete_task(int(task_id)):
-                self._error(404, "Task not found")
-            else:
-                self._send_json({}, 200)
-                self._task_manager.save_tasks()
+            task_id = int(task_oid)
         except Exception as e:
-            self._error(500, "complete task error")
-            print(f"complete task error: {e} {task_id}")
+            print(f"complete task error: {e} {task_oid}")
+            self._error(400, "Task id must be integer")
+            return
+
+        if not self._task_manager.complete_task(task_id):
+            self._error(404, "Task not found")
+        else:
+            self._send_json({}, 200)
+            self._task_manager.save_tasks()
+
 
     def get_tasks(self):
         tasks = [task.to_dict() for task in self._task_manager.tasks]
@@ -186,7 +192,7 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
         elif len(parts) == 3 and parts[0] == "tasks" and parts[2] == "complete":
             self.complete_task(parts[1])
         else:
-            self._error(400, "Not found")
+            self._error(404, "Not found")
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -195,7 +201,7 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
         if parsed.path == "/tasks":
             self.get_tasks()
         else:
-            self._error(400, "Not found")
+            self._error(404, "Not found")
 
 def run(host="127.0.0.1", port=8000):
     storage = FileStorage(FILE_PATH)
