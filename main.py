@@ -2,6 +2,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from enum import Enum
 from pathlib import Path
+from functools import partial
 import json
 
 TASKS = []
@@ -115,8 +116,15 @@ class TaskManager:
         for task in self._tasks:
             if task.id == task_id:
                 task.complete()
+                return True
+
+        return False
 
 class TaskRESTHandler(BaseHTTPRequestHandler):
+    def __init__(self, task_manager, *args, **kwargs):
+        self._task_manager = task_manager
+        super().__init__(*args, **kwargs)
+
     def _read_json_body(self):
         length = int(self.headers.get('content-length', 0))
         raw = self.rfile.read(length) if length > 0 else b""
@@ -140,13 +148,34 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
         self._send_json({"error": msg, "status": status})
 
     def create_task(self):
-        pass
+        body = self._read_json_body()
+        if not body or "title" not in body or "priority" not in body:
+            self._error(400, "Title or Priority must be specified")
+            return
+
+        try:
+            priority = Priority(body["priority"])
+            task = self._task_manager.add_task(body["title"], priority)
+            self._task_manager.save_tasks()
+            self._send_json(task.to_dict(), 201)
+        except Exception as e:
+            print(f"create task error: {e} {body}")
+            self._error(400, f"create task error: {e}")
 
     def complete_task(self, task_id):
-        pass
+        try:
+            if not self._task_manager.complete_task(int(task_id)):
+                self._error(404, "Task not found")
+            else:
+                self._send_json({}, 200)
+                self._task_manager.save_tasks()
+        except Exception as e:
+            self._error(500, "complete task error")
+            print(f"complete task error: {e} {task_id}")
 
     def get_tasks(self):
-        pass
+        tasks = [task.to_dict() for task in self._task_manager.tasks]
+        self._send_json(tasks, 200)
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -168,4 +197,21 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
         else:
             self._error(400, "Not found")
 
+def run(host="127.0.0.1", port=8000):
+    storage = FileStorage(FILE_PATH)
+    task_manager = TaskManager(storage)
 
+    task_manager.restore_tasks()
+
+    handler = partial(TaskRESTHandler, task_manager)
+
+    print(f"Serving on http://{host}:{port}")
+    server = HTTPServer((host, port), handler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("Shutting down...")
+        server.server_close()
+
+if __name__ == "__main__":
+    run()
