@@ -5,8 +5,6 @@ from pathlib import Path
 from functools import partial
 import json
 
-TASKS = []
-NEXT_TASK_ID = 1
 FILE_PATH = "tasks.txt"
 
 class Priority(Enum):
@@ -16,8 +14,8 @@ class Priority(Enum):
 
 class Task:
     def __init__(self, title, priority, is_done, id):
-        if type(priority) is not Priority:
-            raise TypeError(f"priorty param must be a priority enum, but got {type(priority)}")
+        if not isinstance(priority, Priority):
+            raise TypeError(f"priority param must be a priority enum, but got {type(priority)}")
         
         self._title = title
         self._priority = priority
@@ -97,6 +95,11 @@ class TaskManager:
         self._storage = storage
 
     def add_task(self, title, priority):
+        if not title or not isinstance(title, str):
+            raise ValueError("Title must be a non-empty string")
+        if not isinstance(priority, Priority):
+            raise TypeError("Priority must be a Priority enum")
+        
         task = Task(title, priority, False, self._next_task_id)
         self._tasks.append(task)
         self._next_task_id += 1
@@ -104,15 +107,15 @@ class TaskManager:
 
     @property
     def tasks(self):
-        return self._tasks
+        return self._tasks.copy()
 
     def save_tasks(self):
         self._storage.save_tasks(self._tasks)
 
     def restore_tasks(self):
         self._tasks = self._storage.restore_tasks()
-        if len(self._tasks) != 0:
-            self._next_task_id = self._tasks[-1].id + 1
+        if self._tasks:
+            self._next_task_id = max(task.id for task in self._tasks) + 1
 
     def complete_task(self, task_id):
         for task in self._tasks:
