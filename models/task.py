@@ -37,7 +37,7 @@ class Task:
         return {
             "title": self._title,
             "priority": self._priority.name,
-            "is_done": self._is_done,
+            "isDone": self._is_done,
             "id": self._id,
         }
 
@@ -46,6 +46,6 @@ class Task:
     def from_dict(data):
         return Task(data["title"],
                     Priority[data["priority"]],
-                    data["is_done"],
+                    data["isDone"],
                     data["id"]
         )
