@@ -1,13 +1,13 @@
 from storage.abstract_storage import AbstractStorage
-from pathlib import Path
 from models.task import Task
 import json
+import os
 
 
 # Класс файлового хранилища
 class FileStorage(AbstractStorage):
     def __init__(self, file_path):
-        self._file_path = Path(file_path)
+        self._file_path = file_path
 
     def save_tasks(self, tasks):
         # Записываем записи формата json в файла
@@ -21,7 +21,7 @@ class FileStorage(AbstractStorage):
 
     def restore_tasks(self):
         # Проверка существования файла
-        if not self._file_path.exists():
+        if not os.path.exists(self._file_path):
             print(f"restore file not found {self._file_path}")
             return []
 
