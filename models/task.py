@@ -1,5 +1,6 @@
 from models.priority import Priority
 
+
 #Класс задания
 class Task:
     def __init__(self, title, priority, is_done, id):
@@ -48,4 +49,4 @@ class Task:
                     Priority[data["priority"]],
                     data["isDone"],
                     data["id"]
-        )
+                    )

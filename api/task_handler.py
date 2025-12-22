@@ -4,10 +4,11 @@ from urllib.parse import urlparse
 
 from models.priority import Priority
 
-#Класс обработчик запросов
+
+# Класс обработчик запросов
 class TaskRESTHandler(BaseHTTPRequestHandler):
     def __init__(self, task_manager, *args, **kwargs):
-        #Добавляем объект для управления списком задач
+        # Добавляем объект для управления списком задач
         self._task_manager = task_manager
         super().__init__(*args, **kwargs)
 
@@ -39,22 +40,23 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
             self._error(400, "Title and Priority must be specified")
             return
 
-        #Проверка на соответствие приоритета элементу из заданного Enum
+        # Проверка на соответствие приоритета элементу из заданного Enum
         try:
             priority = Priority[body["priority"]]
         except Exception as e:
             print(f"create task error: priority must be 'low', 'medium' or 'high', but got {body["priority"]}")
-            self._error(400, f"create task error: priority must be 'low', 'medium' or 'high', but got '{body["priority"]}'")
+            self._error(400,
+                        f"create task error: priority must be 'low', 'medium' or 'high', but got '{body["priority"]}'")
             return
 
-        #Добавляем задачу и сохраняем файл
+        # Добавляем задачу и сохраняем файл
         task = self._task_manager.add_task(body["title"], priority)
         self._task_manager.save_tasks()
-        #Отправляем в ответ созданную задачу
+        # Отправляем в ответ созданную задачу
         self._send_json(task.to_dict(), 201)
 
     def complete_task(self, task_oid):
-        #Проверка на тип id
+        # Проверка на тип id
         try:
             task_id = int(task_oid)
         except Exception as e:
@@ -62,11 +64,11 @@ class TaskRESTHandler(BaseHTTPRequestHandler):
             self._error(400, "Task id must be integer")
             return
 
-        #Если не нашли задачу, то возвращаем 404
+        # Если не нашли задачу, то возвращаем 404
         if not self._task_manager.complete_task(task_id):
             self._error(404, "Task not found")
         else:
-            #Иначе пустое тело ответа и сохраняем задачи
+            # Иначе пустое тело ответа и сохраняем задачи
             self._send_json({}, 200)
             self._task_manager.save_tasks()
 
