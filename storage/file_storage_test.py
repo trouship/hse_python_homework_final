@@ -45,6 +45,16 @@ def test_file_storage_save_task_is_valid(tmp_path):
     assert task['isDone'] == True
     assert task['id'] == 1
 
+def test_file_storage_restore_task_file_doesnt_exist(tmp_path):
+    # Arrange
+    file_path = tmp_path / 'test.txt'
+    storage = FileStorage(file_path)
+
+    # Act
+    tasks = storage.restore_tasks()
+
+    # Assert
+    assert tasks == []
 
 def test_file_storage_restore_task_is_valid(tmp_path):
     # Arrange
